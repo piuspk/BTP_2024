@@ -1,10 +1,11 @@
+import os
 import itertools
 import random
-import os
 import schemdraw
 from schemdraw.logic import table
 from fpdf import FPDF
 import time
+import cairosvg
 
 # Directory to save truth table PDFs and images
 pdf_directory = r'C:\Users\Lenovo\OneDrive\Desktop\logicgates\pdf'
@@ -42,7 +43,7 @@ expressions = [
 def evaluate_expression(expr, A, B, C, D):
     return eval(expr.replace('and', ' and ').replace('or', ' or ').replace('not', ' not '))
 
-# Function to generate the truth table
+# Function to generate the truth table and save as both SVG and PNG
 def generate_truth_table_image(expr, save_path):
     table_str = "| A | B | C | D | Q |\n"
     table_str += "|---|---|---|---|---|\n"
@@ -52,13 +53,20 @@ def generate_truth_table_image(expr, save_path):
         Q = evaluate_expression(expr, A, B, C, D)
         table_str += f"| {A} | {B} | {C} | {D} | {int(Q)} |\n"
     
-    # Generate the truth table image using schemdraw
+    # Generate the truth table image using schemdraw and save as SVG
     colfmt = 'c|c|c|c|c'
     tbl_schem = table.Table(table=table_str.strip(), colfmt=colfmt)
     d = schemdraw.Drawing()
     d += tbl_schem
-    d.save(save_path)
+    d.save(save_path)  # Save as SVG by specifying .svg extension
     print(f"Truth table saved as {save_path}")
+    
+    # Convert SVG to PNG and save in the same directory
+    png_path = save_path.replace('.svg', '.png')
+    cairosvg.svg2png(url=save_path, write_to=png_path)
+    print(f"PNG image saved as {png_path}")
+    
+    return save_path, png_path
 
 # Function to generate a PDF with questions and answers
 def generate_pdf(questions, answers):
@@ -80,11 +88,14 @@ def generate_pdf(questions, answers):
         pdf.set_font("Arial", size=12)
         pdf.cell(200, 10, txt="Answer:", ln=True, align='L')
 
+        # Add PNG to PDF for compatibility
+        png_path = answers[i-1]
+        
         # Calculate the image size to fit the page
         max_width = pdf.w - 20  # Max width of image (page width - margins)
         max_height = pdf.h - pdf.get_y() - 30  # Max height of image (page height - current position - margin)
         
-        pdf.image(answers[i-1], x=10, w=max_width, h=max_height)  # Adjust image size to fit on the page
+        pdf.image(png_path, x=10, w=max_width, h=max_height)  # Add PNG to PDF
         
     # Save PDF with a unique name
     timestamp = time.strftime("%Y%m%d-%H%M%S")
@@ -98,7 +109,8 @@ def main():
     num_questions = int(input("How many questions would you like? "))
 
     questions = []
-    answers = []
+    svg_paths = []
+    png_paths = []
 
     for i in range(num_questions):
         # Randomly select an expression
@@ -110,14 +122,15 @@ def main():
         input("Press Enter to see the correct answer...")
 
         # Generate and save the truth table image
-        save_path = os.path.join(image_directory, f'truth_table_{i+1}.png')
-        generate_truth_table_image(expr[1], save_path)
-        answers.append(save_path)
+        save_path = os.path.join(image_directory, f'truth_table_{i+1}.svg')
+        svg_path, png_path = generate_truth_table_image(expr[1], save_path)
+        svg_paths.append(svg_path)
+        png_paths.append(png_path)
 
     # Ask if the user wants to generate a PDF
     create_pdf = input("Do you want to create a PDF with the questions and answers? (yes/no): ").strip().lower()
     if create_pdf == 'yes':
-        generate_pdf(questions, answers)
+        generate_pdf(questions, png_paths)  # Use PNG paths for the PDF generation
 
 if __name__ == "__main__":
     main()
