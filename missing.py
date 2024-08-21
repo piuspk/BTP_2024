@@ -16,32 +16,56 @@ image_directory = r'C:\Users\Lenovo\OneDrive\Desktop\logicgates\Truthtable'
 os.makedirs(pdf_directory, exist_ok=True)
 os.makedirs(image_directory, exist_ok=True)
 
-# List of predefined logical expressions using only `and` and `not` with five variables (A, B, C, D, E)
-expressions = [
-    ('Q1', 'A and not (B and C and D and E)'),
-    ('Q2', 'not A and (B or C or D or E)'),
-    # Add more expressions as needed
-]
+# Possible operators for generating random expressions
+operators = ['and', 'or', 'not']
+
+# Function to generate a random logical expression
+def generate_random_expression(num_vars):
+    variables = [chr(65 + i) for i in range(num_vars)]  # A, B, C, D, E...
+    expr = variables[0]
+    for i in range(1, num_vars):
+        op = random.choice(operators[:-1])  # Choose 'and' or 'or'
+        if random.choice([True, False]):
+            expr = f'{expr} {op} {variables[i]}'
+        else:
+            expr = f'{expr} {op} not {variables[i]}'
+    if random.choice([True, False]):
+        expr = f'not ({expr})'
+    return expr
 
 # Function to evaluate logical expressions
-def evaluate_expression(expr, A, B, C, D, E):
-    return eval(expr.replace('and', ' and ').replace('or', ' or ').replace('not', ' not '))
+def evaluate_expression(expr, values_dict):
+    # Replace variables in the expression with their corresponding values
+    for var in values_dict:
+        expr = expr.replace(var, str(values_dict[var]))
+    return eval(expr)
 
-# Function to generate the truth table with missing entries
-def generate_truth_table_image(expr, save_path, complete=False):
-    table_str = "| A | B | C | D | E | Q |\n"
-    table_str += "|---|---|---|---|---|---|\n"
+# Function to generate the truth table with 50% missing entries
+def generate_truth_table_image(expr, save_path, num_vars, complete=False):
+    headers = [chr(65 + i) for i in range(num_vars)]  # A, B, C, D, E...
+    headers.append('Q')
     
-    for values in itertools.product([0, 1], repeat=5):
-        A, B, C, D, E = values
-        Q = evaluate_expression(expr, A, B, C, D, E)
-        if complete or random.random() > 0.2:  # 80% chance to include the correct answer
-            table_str += f"| {A} | {B} | {C} | {D} | {E} | {int(Q)} |\n"
+    table_str = " | ".join(headers) + "\n"
+    table_str += "|".join(["---"] * (num_vars + 1)) + "\n"
+    
+    all_rows = []
+    
+    for values in itertools.product([0, 1], repeat=num_vars):
+        values_dict = {chr(65 + i): val for i, val in enumerate(values)}
+        Q = int(evaluate_expression(expr, values_dict))
+        all_rows.append((values_dict, Q))
+    
+    num_rows = len(all_rows)
+    missing_indices = set(random.sample(range(num_rows), num_rows // 2))  # 50% missing entries
+    
+    for i, (values_dict, Q) in enumerate(all_rows):
+        if complete or i not in missing_indices:  # 50% chance to include the correct answer
+            table_str += " | ".join(str(values_dict[header]) for header in headers[:-1]) + f" | {Q}\n"
         else:
-            table_str += f"| {A} | {B} | {C} | {D} | {E} | ? |\n"  # Leave missing entries
-
+            table_str += " | ".join(str(values_dict[header]) for header in headers[:-1]) + " | ?\n"  # Leave missing entries
+    
     # Generate the truth table image using schemdraw and save as SVG
-    colfmt = 'c|c|c|c|c|c'
+    colfmt = 'c|' * (num_vars + 1)
     tbl_schem = table.Table(table=table_str.strip(), colfmt=colfmt)
     d = schemdraw.Drawing()
     d += tbl_schem
@@ -115,8 +139,11 @@ def main():
     complete_answers = []
 
     for i in range(num_questions):
-        # Randomly select an expression
-        expr = random.choice(expressions)
+        # Randomly select the number of variables for this question (2 to 5)
+        num_vars = random.choice([2, 3, 4, 5])
+
+        # Randomly generate an expression with the selected number of variables
+        expr = ('Q' + str(i+1), generate_random_expression(num_vars))
         questions.append(expr)
 
         # Display the question to the user
@@ -125,12 +152,12 @@ def main():
 
         # Generate and save the incomplete truth table image in SVG format
         svg_save_path = os.path.join(image_directory, f'truth_table_incomplete_{i+1}.svg')
-        generate_truth_table_image(expr[1], svg_save_path, complete=False)
+        generate_truth_table_image(expr[1], svg_save_path, num_vars, complete=False)
         incomplete_answers.append(svg_save_path)
 
         # Generate and save the complete truth table image in SVG format
         svg_save_path_complete = os.path.join(image_directory, f'truth_table_complete_{i+1}.svg')
-        generate_truth_table_image(expr[1], svg_save_path_complete, complete=True)
+        generate_truth_table_image(expr[1], svg_save_path_complete, num_vars, complete=True)
         complete_answers.append(svg_save_path_complete)
 
     # Ask if the user wants to generate a PDF
