@@ -15,7 +15,7 @@ image_directory = r'C:\Users\Lenovo\OneDrive\Desktop\logicgates\Truthtable'
 os.makedirs(pdf_directory, exist_ok=True)
 os.makedirs(image_directory, exist_ok=True)
 
-# Function to generate random logical expressions
+# Function to generate random logical expressions with a given set of variables
 def generate_random_expression(variables):
     operators = ['and', 'or']
     num_operators = random.randint(1, 3)  # Choose between 1 to 3 operators for complexity
@@ -31,21 +31,27 @@ def generate_random_expression(variables):
     return expression
 
 # Function to evaluate logical expressions
-def evaluate_expression(expr, A, B, C, D, E):
+def evaluate_expression(expr, *values):
+    # Map variable names to their corresponding values
+    variables = 'ABCDE'
+    for i, value in enumerate(values):
+        expr = expr.replace(variables[i], str(value))
     return eval(expr.replace('and', ' and ').replace('or', ' or ').replace('not', ' not '))
 
 # Function to generate the truth table
-def generate_truth_table_image(expr, save_path):
-    table_str = "| A | B | C | D | E | Q |\n"
-    table_str += "|---|---|---|---|---|---|\n"
+def generate_truth_table_image(expr, save_path, num_vars):
+    headers = [chr(65 + i) for i in range(num_vars)]  # Generate headers A, B, C, etc.
+    headers.append('Q')
     
-    for values in itertools.product([0, 1], repeat=5):
-        A, B, C, D, E = values
-        Q = evaluate_expression(expr, A, B, C, D, E)
-        table_str += f"| {A} | {B} | {C} | {D} | {E} | {int(Q)} |\n"
+    table_str = " | ".join(headers) + "\n"
+    table_str += "|".join(["---"] * (num_vars + 1)) + "\n"
+    
+    for values in itertools.product([0, 1], repeat=num_vars):
+        Q = evaluate_expression(expr, *values)
+        table_str += " | ".join(map(str, values)) + f" | {int(Q)}\n"
     
     # Generate the truth table image using schemdraw
-    colfmt = 'c|c|c|c|c|c'
+    colfmt = 'c|' * (num_vars + 1)
     tbl_schem = table.Table(table=table_str.strip(), colfmt=colfmt)
     d = schemdraw.Drawing()
     d += tbl_schem
@@ -120,8 +126,12 @@ def main():
     correct_answers = []
 
     for i in range(num_questions):
-        # Randomly generate an expression
-        expr = generate_random_expression(['A', 'B', 'C', 'D', 'E'])
+        # Randomly choose the number of variables for this question (2 to 5)
+        num_vars = random.choice([2, 3, 4, 5])
+
+        # Generate a set of variable names based on the number of variables
+        variables = [chr(65 + i) for i in range(num_vars)]
+        expr = generate_random_expression(variables)
         questions.append(expr)
         correct_answers.append(expr)
 
@@ -131,7 +141,7 @@ def main():
 
         # Generate and save the truth table image
         svg_path = os.path.join(image_directory, f'truth_table_{i+1}.svg')
-        generate_truth_table_image(expr, svg_path)
+        generate_truth_table_image(expr, svg_path, num_vars)
         answers.append(svg_path)
 
     # Ask if the user wants to generate a PDF
