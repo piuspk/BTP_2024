@@ -100,6 +100,18 @@ def generate_pdf(questions, answers, complete_answers, options_list):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=False)
 
+    # Add title and time to the first page
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, txt="Quiz", ln=True, align='C')
+
+    total_time = len(questions)  # Assuming 1 minute per question
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt=f"Total Time: {total_time} minutes", ln=True, align='C')
+
+    pdf.ln(10)  # Add a line break
+
+    # Add questions
     for i, question in enumerate(questions, 1):
         pdf.add_page()
         pdf.set_font("Arial", size=12)
@@ -127,10 +139,16 @@ def generate_pdf(questions, answers, complete_answers, options_list):
             pdf.image(png_temp_path, x=10, y=pdf.get_y(), w=img_width, h=img_height)
             os.remove(png_temp_path)  # Delete the temporary PNG file
 
-        # Add the answer on the next page
+    # Start answers on a new page
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, txt="Answers", ln=True, align='C')
+    pdf.ln(10)
+
+    for i, question in enumerate(questions, 1):
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt="Answer:", ln=True, align='L')
+        pdf.cell(200, 10, txt=f"Answer to Question {i}:", ln=True, align='L')
 
         # Identify and add the correct option
         correct_option_index = None
@@ -173,34 +191,26 @@ def main():
     options_list = []
 
     for i in range(num_questions):
-        num_vars = random.choice([2, 3, 4, 5])
-        expr = ('Q' + str(i+1), generate_random_expression(num_vars))
+        num_vars = random.choice([2, 3, 4, 5])  # Choose random number of variables between 2 and 5
+        expr = generate_random_expression(num_vars)
 
-        # Display the question to the user
-        print(f"Question {i+1}: Fill in the missing entries for this expression: {expr[1]}")
-        input("Press Enter to see the correct answer...")
+        # Generate and save the incomplete truth table
+        incomplete_table_path = os.path.join(image_directory, f'incomplete_truth_table_{i+1}.svg')
+        correct_missing_values = generate_truth_table_image(expr, incomplete_table_path, num_vars)
+        incomplete_answers.append(incomplete_table_path)
 
-        # Generate and save the incomplete truth table image in SVG format
-        svg_save_path = os.path.join(image_directory, f'truth_table_incomplete_{i+1}.svg')
-        missing_values = generate_truth_table_image(expr[1], svg_save_path, num_vars, complete=False)
-        incomplete_answers.append(svg_save_path)
+        # Generate and save the complete truth table
+        complete_table_path = os.path.join(image_directory, f'complete_truth_table_{i+1}.svg')
+        generate_truth_table_image(expr, complete_table_path, num_vars, complete=True)
+        complete_answers.append(complete_table_path)
 
-        # Generate and save the complete truth table image in SVG format
-        svg_save_path_complete = os.path.join(image_directory, f'truth_table_complete_{i+1}.svg')
-        generate_truth_table_image(expr[1], svg_save_path_complete, num_vars, complete=True)
-        complete_answers.append(svg_save_path_complete)
-
-        # Generate options for the missing values
-        options = generate_options(missing_values)
+        # Generate four options including the correct missing values
+        options = generate_options(correct_missing_values)
         options_list.append(options)
 
-        # Store the question with its correct answer (missing values)
-        questions.append((expr[0], expr[1], missing_values))
+        questions.append((incomplete_table_path, expr, correct_missing_values))
 
-    # Ask user if they want a PDF
-    create_pdf = input("Would you like to generate a PDF of these questions? (yes/no): ").strip().lower()
-    if create_pdf == 'yes':
-        generate_pdf(questions, incomplete_answers, complete_answers, options_list)
+    generate_pdf(questions, incomplete_answers, complete_answers, options_list)
 
 if __name__ == "__main__":
     main()
