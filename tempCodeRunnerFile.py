@@ -5,8 +5,7 @@ import schemdraw
 from schemdraw.logic import table
 from fpdf import FPDF
 import time
-import cairosvg
-from PIL import Image
+from cairosvg import svg2png
 
 # Directory to save truth table PDFs and images
 pdf_directory = r'C:\Users\Lenovo\OneDrive\Desktop\logicgates\pdf'
@@ -16,178 +15,87 @@ image_directory = r'C:\Users\Lenovo\OneDrive\Desktop\logicgates\Truthtable'
 os.makedirs(pdf_directory, exist_ok=True)
 os.makedirs(image_directory, exist_ok=True)
 
-# Define logic gates functions
-gates = {
-    'AND': lambda a, b: a and b,
-    'OR': lambda a, b: a or b,
-    'NAND': lambda a, b: not (a and b),
-    'NOR': lambda a, b: not (a or b),
-    'XOR': lambda a, b: a != b,
-    'XNOR': lambda a, b: a == b
-}
+# Possible operators for generating random expressions
+operators = ['and', 'or', 'not']
 
-# Function to generate the truth table
-def generate_truth_table_image(gate_name, save_path):
-    num_vars = 2  # Only for 2-input gates
-    headers = ['A', 'B', 'Q']
+# Function to generate a random logical expression with a maximum of 3 variables
+def generate_random_expression(num_vars):
+    variables = [chr(65 + i) for i in range(num_vars)]  # A, B, C, ...
+    expr = variables[0]
+    for i in range(1, num_vars):
+        op = random.choice(operators[:-1])  # Choose 'and' or 'or'
+        if random.choice([True, False]):
+            expr = f'{expr} {op} {variables[i]}'
+        else:
+            expr = f'{expr} {op} not {variables[i]}'
+    if random.choice([True, False]):
+        expr = f'not ({expr})'
+    return expr
+
+# Function to evaluate logical expressions
+def evaluate_expression(expr, values_dict):
+    # Replace variables in the expression with their corresponding values
+    for var in values_dict:
+        expr = expr.replace(var, str(values_dict[var]))
+    return eval(expr)
+
+# Function to generate the truth table and save it as SVG and PNG
+def generate_truth_table_images(expr, save_path_svg, num_vars):
+    headers = [chr(65 + i) for i in range(num_vars)]  # A, B, C, ...
+    headers.append('Q')
     
     table_str = " | ".join(headers) + "\n"
-    table_str += "|".join(["---"] * len(headers)) + "\n"
-    
+    table_str += "|".join(["---"] * (num_vars + 1)) + "\n"
+
     for values in itertools.product([0, 1], repeat=num_vars):
-        Q = gates[gate_name](*values)
-        table_str += " | ".join(map(str, values)) + f" | {int(Q)}\n"
-    
-    # Generate the truth table image using schemdraw
-    colfmt = 'c|' * len(headers)
+        values_dict = {chr(65 + i): val for i, val in enumerate(values)}
+        Q = int(evaluate_expression(expr, values_dict))
+        row = " | ".join(str(values_dict[chr(65 + i)]) for i in range(num_vars))
+        table_str += f"{row} | {Q}\n"
+
+    # Generate the truth table image using schemdraw and save as SVG
+    colfmt = 'c|' * (num_vars + 1)
     tbl_schem = table.Table(table=table_str.strip(), colfmt=colfmt)
     d = schemdraw.Drawing()
     d += tbl_schem
-    d.save(save_path)
-    print(f"Truth table saved as {save_path}")
+    d.save(save_path_svg)
+    print(f"Truth table saved as SVG: {save_path_svg}")
 
-# Function to convert SVG to PNG
-def convert_svg_to_png(svg_path, png_path):
-    with open(svg_path, "rb") as svg_file:
-        svg_data = svg_file.read()
-    png_data = cairosvg.svg2png(bytestring=svg_data)
-    with open(png_path, "wb") as png_file:
-        png_file.write(png_data)
+    # Convert SVG to PNG and return the file path
+    png_data = svg2png(url=save_path_svg)
+    save_path_png = save_path_svg.replace(".svg", ".png")
+    with open(save_path_png, "wb") as f:
+        f.write(png_data)
+    
+    return save_path_png
 
 # Function to generate a PDF with questions and answers
-def generate_pdf(questions, answers, correct_answers):
+def generate_pdf(questions):
     pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=10)
+    pdf.set_auto_page_break(auto=True, margin=15)
 
-    # Page settings for fitting two questions per page
-    page_height = pdf.h
-    margin = 10
-    content_height = page_height - 2 * margin
-    
-    question_height = 15
-    truth_table_height = content_height // 2 - question_height - 10
-    options_height = content_height // 2 - 10
-
-    num_questions = len(questions)
-    for i in range(0, num_questions, 2):
+    for i, (expr, svg_path, png_path) in enumerate(questions, 1):
         pdf.add_page()
         pdf.set_font("Arial", size=12)
 
-        # Add the first question
-        q1 = i
-        if q1 < num_questions:
-            pdf.set_xy(margin, margin)
-            question_text1 = f"Question {q1 + 1}: Which logic gate does the following truth table represent?"
-            pdf.multi_cell(0, question_height, txt=question_text1, align='L')
+        # Add the question and expression on a single line
+        question_text = f"Question {i}: What is the truth table for the expression: {expr}"
+        pdf.multi_cell(0, 10, txt=question_text, align='L')
+        
+        # Add label and image
+        pdf.ln(10)
+        pdf.set_font("Arial", size=12)
+        pdf.cell(200, 10, txt="Answer:", ln=True, align='L')
 
-            # Add the first truth table image
-            pdf.ln(5)
-            svg_path1 = answers[q1]
-            png_path1 = os.path.join(image_directory, f'truth_table_{q1 + 1}.png')
-            convert_svg_to_png(svg_path1, png_path1)
-            
-            with Image.open(png_path1) as img:
-                original_width, original_height = img.size
-                new_width = original_width * 0.5
-                new_height = original_height * 0.5
-
-                max_width = pdf.w - 2 * margin
-                max_height = truth_table_height
-                if new_width > max_width:
-                    new_width = max_width
-                    new_height = new_width * (original_height / original_width)
-                
-                if new_height > max_height:
-                    new_height = max_height
-                    new_width = new_height * (original_width / original_height)
-
-            pdf.image(png_path1, x=margin, w=new_width, h=new_height)
-
-            # Add options for the first question
-            pdf.ln(5)
-            pdf.set_font("Arial", size=12)
-            
-            options1 = list(gates.keys())
-            correct_option1 = correct_answers[q1]
-            random.shuffle(options1)  # Shuffle options
-            options1 = options1[:4]  # Limit to 4 options
-            if correct_option1 not in options1:
-                options1[-1] = correct_option1  # Ensure correct option is included
-            random.shuffle(options1)  # Shuffle again to randomize position
-
-            # Add options in grid format (2x2)
-            for row in range(2):
-                pdf.set_y(pdf.get_y() + 5)
-                for col in range(2):
-                    idx = row * 2 + col
-                    if idx < len(options1):
-                        pdf.set_x(margin + col * 90)  # Adjust x position for grid
-                        pdf.cell(45, 10, txt=f"({chr(97 + idx)}) {options1[idx]}", ln=False, align='L')
-
-            # Add the correct answer at the end
-            pdf.ln(10)
-            pdf.set_font("Arial", size=12)
-            pdf.cell(200, 10, txt=f"Correct Answer: {correct_option1}", ln=True, align='L')
-
-        # Add the second question (if available)
-        q2 = i + 1
-        if q2 < num_questions:
-            pdf.set_xy(margin, pdf.get_y() + options_height + 15)
-            question_text2 = f"Question {q2 + 1}: Which logic gate does the following truth table represent?"
-            pdf.multi_cell(0, question_height, txt=question_text2, align='L')
-
-            # Add the second truth table image
-            pdf.ln(5)
-            svg_path2 = answers[q2]
-            png_path2 = os.path.join(image_directory, f'truth_table_{q2 + 1}.png')
-            convert_svg_to_png(svg_path2, png_path2)
-            
-            with Image.open(png_path2) as img:
-                original_width, original_height = img.size
-                new_width = original_width * 0.5
-                new_height = original_height * 0.5
-
-                max_width = pdf.w - 2 * margin
-                max_height = truth_table_height
-                if new_width > max_width:
-                    new_width = max_width
-                    new_height = new_width * (original_height / original_width)
-                
-                if new_height > max_height:
-                    new_height = max_height
-                    new_width = new_height * (original_width / original_height)
-
-            pdf.image(png_path2, x=margin, w=new_width, h=new_height)
-
-            # Add options for the second question
-            pdf.ln(5)
-            pdf.set_font("Arial", size=12)
-            
-            options2 = list(gates.keys())
-            correct_option2 = correct_answers[q2]
-            random.shuffle(options2)  # Shuffle options
-            options2 = options2[:4]  # Limit to 4 options
-            if correct_option2 not in options2:
-                options2[-1] = correct_option2  # Ensure correct option is included
-            random.shuffle(options2)  # Shuffle again to randomize position
-
-            # Add options in grid format (2x2)
-            for row in range(2):
-                pdf.set_y(pdf.get_y() + 5)
-                for col in range(2):
-                    idx = row * 2 + col
-                    if idx < len(options2):
-                        pdf.set_x(margin + col * 90)  # Adjust x position for grid
-                        pdf.cell(45, 10, txt=f"({chr(97 + idx)}) {options2[idx]}", ln=False, align='L')
-
-            # Add the correct answer at the end
-            pdf.ln(10)
-            pdf.set_font("Arial", size=12)
-            pdf.cell(200, 10, txt=f"Correct Answer: {correct_option2}", ln=True, align='L')
+        # Calculate the image size to fit the page
+        max_width = pdf.w - 20  # Max width of image (page width - margins)
+        max_height = pdf.h - pdf.get_y() - 30  # Max height of image (page height - current position - margin)
+        
+        pdf.image(png_path, x=10, w=max_width, h=max_height)  # Adjust image size to fit on the page
 
     # Save PDF with a unique name
     timestamp = time.strftime("%Y%m%d-%H%M%S")
-    pdf_name = os.path.join(pdf_directory, f'identify_gate_{timestamp}.pdf')
+    pdf_name = os.path.join(pdf_directory, f'truth_tables_{timestamp}.pdf')
     pdf.output(pdf_name)
     print(f"PDF saved as {pdf_name}")
 
@@ -197,28 +105,30 @@ def main():
     num_questions = int(input("How many questions would you like? "))
 
     questions = []
-    answers = []
-    correct_answers = []
+    unique_expressions = set()
 
     for i in range(num_questions):
-        # Randomly choose a gate for this question
-        gate_name = random.choice(list(gates.keys()))
-        questions.append(gate_name)
-        correct_answers.append(gate_name)
+        # Randomly select the number of variables for this question (max 3)
+        num_vars = random.choice([2, 3])
 
-        # Display the question to the user
-        print(f"Question {i + 1}: Which logic gate does the following truth table represent?")
-        input("Press Enter to see the truth table...")
-
-        # Generate and save the truth table image
-        svg_path = os.path.join(image_directory, f'truth_table_{i + 1}.svg')
-        generate_truth_table_image(gate_name, svg_path)
-        answers.append(svg_path)
+        # Generate a unique random expression with the selected number of variables
+        while True:
+            expr = generate_random_expression(num_vars)
+            if expr not in unique_expressions:
+                unique_expressions.add(expr)
+                break
+        print(f"Generated expression: {expr}")
+        
+        # Generate and save the truth table images (SVG and PNG)
+        save_path_svg = os.path.join(image_directory, f'truth_table_{i+1}.svg')
+        save_path_png = generate_truth_table_images(expr, save_path_svg, num_vars)
+        
+        questions.append((expr, save_path_svg, save_path_png))
 
     # Ask if the user wants to generate a PDF
     create_pdf = input("Do you want to create a PDF with the questions and answers? (yes/no): ").strip().lower()
     if create_pdf == 'yes':
-        generate_pdf(questions, answers, correct_answers)
+        generate_pdf(questions)
 
 if __name__ == "__main__":
     main()

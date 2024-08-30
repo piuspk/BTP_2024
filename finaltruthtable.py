@@ -6,7 +6,6 @@ from schemdraw.logic import table
 from fpdf import FPDF
 import time
 from cairosvg import svg2png
-from io import BytesIO
 
 # Directory to save truth table PDFs and images
 pdf_directory = r'C:\Users\Lenovo\OneDrive\Desktop\logicgates\pdf'
@@ -19,7 +18,7 @@ os.makedirs(image_directory, exist_ok=True)
 # Possible operators for generating random expressions
 operators = ['and', 'or', 'not']
 
-# Function to generate a random logical expression
+# Function to generate a random logical expression with a maximum of 3 variables
 def generate_random_expression(num_vars):
     variables = [chr(65 + i) for i in range(num_vars)]  # A, B, C, ...
     expr = variables[0]
@@ -70,7 +69,7 @@ def generate_truth_table_images(expr, save_path_svg, num_vars):
     
     return save_path_png
 
-# Function to generate a PDF with questions and answers
+# Function to generate a PDF with questions and answersa
 def generate_pdf(questions):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -108,8 +107,8 @@ def main():
     questions = []
 
     for i in range(num_questions):
-        # Randomly select the number of variables for this question
-        num_vars = random.choice([2, 3, 4, 5])
+        # Randomly select the number of variables for this question (max 3)
+        num_vars = random.choice([2, 3])
 
         # Generate a random expression with the selected number of variables
         expr = generate_random_expression(num_vars)
