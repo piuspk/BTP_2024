@@ -72,44 +72,52 @@ def generate_pdf(questions, answers, correct_answers, original_options):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # Adding the title and the first question on the same page
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, txt="Logic Gate Quiz", ln=True, align='C')
+    num_questions_per_page = 2
+    num_pages = (len(questions) + num_questions_per_page - 1) // num_questions_per_page
 
-    pdf.ln(10)
+    # Standard image size for consistency
+    image_width = 60  # Width of image in mm
+    image_height = 80  # Height of image in mm
 
-    for i, question in enumerate(questions, 1):
-        if i > 1:
-            pdf.add_page()
-        pdf.set_font("Arial", 'B', 14)
+    for page_num in range(num_pages):
+        pdf.add_page()
+        pdf.set_font("Arial", 'B', 16)
+        if page_num == 0:
+            pdf.cell(0, 10, txt="Logic Gate Quiz", ln=True, align='C')
+        pdf.ln(10)
 
-        # Add the question text
-        question_text = f"Question {i}: Which expression corresponds to the given truth table?"
-        pdf.multi_cell(0, 10, txt=question_text, align='L')
-        pdf.ln(5)  # Reduced distance between the question and the options
+        start_index = page_num * num_questions_per_page
+        end_index = min(start_index + num_questions_per_page, len(questions))
 
-        # Calculate the image size to fit half the page but maintain pixel density
-        max_width = pdf.w / 2 - 20  # Max width of the image to fit on half the page
-        max_height = (pdf.h - pdf.get_y() - 20) * 0.65  # Max height reduced by 35%
+        for i in range(start_index, end_index):
+            question_idx = i + 1
+            pdf.set_font("Arial", 'B', 14)
 
-        # Convert SVG to PNG
-        png_path = os.path.join(image_directory, f'truth_table_{i}.png')
-        convert_svg_to_png(answers[i-1], png_path)
+            question_text = f"Question {question_idx}: Which expression corresponds to the given truth table?"
+            pdf.multi_cell(0, 10, txt=question_text, align='L')
+            pdf.ln(5)
 
-        # Add the truth table image on the right side
-        pdf.image(png_path, x=max_width + 30, y=pdf.get_y(), w=max_width, h=max_height)
+            # Convert SVG to PNG
+            png_path = os.path.join(image_directory, f'truth_table_{question_idx}.png')
+            convert_svg_to_png(answers[i], png_path)
 
-        # Add options for expressions on the left side
-        pdf.set_font("Arial", 'B', 12)
-        pdf.multi_cell(max_width, 10, txt="Options", align='L')
-        
-        options = original_options[i-1]  # Use the original options generated during question creation
-        pdf.set_font("Arial", size=12)
+            # Calculate position for image and text
+            y_start = pdf.get_y()
+            pdf.image(png_path, x=pdf.w - image_width - 20, y=y_start, w=image_width, h=image_height)
 
-        for idx, option in enumerate(options, 1):
-            pdf.multi_cell(max_width, 10, txt=f"({idx}) {option}", align='L')
-            pdf.ln(1)  # Slight spacing between options for readability
+            # Add options for expressions on the left side
+            pdf.set_font("Arial", 'B', 12)
+            pdf.multi_cell(pdf.w - image_width - 30, 10, txt="Options", align='L')
+            
+            options = original_options[i]
+            pdf.set_font("Arial", size=12)
+
+            for idx, option in enumerate(options, 1):
+                pdf.multi_cell(pdf.w - image_width - 30, 10, txt=f"({idx}) {option}", align='L')
+                pdf.ln(1)
+
+            # Move to the next line with additional spacing
+            pdf.ln(image_height + 1)  # Adjust spacing between questions
 
     # Adding the answer section at the end
     pdf.add_page()
@@ -120,7 +128,7 @@ def generate_pdf(questions, answers, correct_answers, original_options):
     pdf.set_font("Arial", size=12)
     for i, correct_option in enumerate(correct_answers, 1):
         options = original_options[i-1]
-        correct_option_number = options.index(correct_option) + 1  # Correct option number based on original options
+        correct_option_number = options.index(correct_option) + 1
         pdf.multi_cell(0, 10, txt=f"Question {i}: ({correct_option_number}) {correct_option}", align='L')
 
     # Save PDF with a unique name
@@ -156,7 +164,7 @@ def main():
         correct_answers.append(expr)
 
         # Generate options including the correct one
-        options = [generate_random_expression(['A', 'B', 'C', 'D', 'E']) for _ in range(3)]
+        options = [generate_random_expression(['A', 'B', 'C']) for _ in range(3)]
         options.append(expr)
         random.shuffle(options)
         original_options.append(options)  # Store the options for later use
