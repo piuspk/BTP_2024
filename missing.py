@@ -112,7 +112,7 @@ def generate_pdf(questions, answers, options_list):
     pdf.ln(10)  # Add a line break
 
     for i, question in enumerate(questions):
-        if i > 0 and i % 2 == 0:
+        if i > 0 and i % 3 == 0:
             pdf.add_page()
 
         # Add the question text
@@ -137,12 +137,16 @@ def generate_pdf(questions, answers, options_list):
             png_temp_path = f'tmp_image_{i+1}.png'
             with open(png_temp_path, 'wb') as f:
                 f.write(png_data.read())
+            
             img_width = pdf.w / 3  # Adjust width to fit one-third of page width
             img_height = img_width * 0.75  # Maintain aspect ratio
-            pdf.image(png_temp_path, x=(pdf.w - img_width) / 2, y=y_position + 20, w=img_width, h=img_height)
+
+            # Calculate x position to place the image 4 cm (40 mm) to the right of the question text
+            x_position = 40  # 40 mm = 4 cm from the left margin
+            pdf.image(png_temp_path, x=x_position, y=y_position, w=img_width, h=img_height)
             os.remove(png_temp_path)  # Delete the temporary PNG file
 
-        pdf.ln(img_height + 30)  # Ensure space between questions and images
+        pdf.ln(img_height + 20)  # Ensure space between questions and images
 
     # Add a separate page for answers
     pdf.add_page()
