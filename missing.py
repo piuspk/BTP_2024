@@ -100,53 +100,61 @@ def generate_pdf(questions, answers, options_list):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)  # Adjust margin as needed
 
-    # Add the first page with title, time, and the first question
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, txt="Self-Assessment Test", ln=True, align='C')
-
-    total_time = len(questions)  # Assuming 1 minute per question
-    pdf.set_font("Arial", size=12)
-    pdf.cell(0, 10, txt=f"Total Time: {total_time} minutes", ln=True, align='C')
-
-    pdf.ln(10)  # Add a line break
-
-    for i, question in enumerate(questions):
-        if i > 0 and i % 3 == 0:
-            pdf.add_page()
-
-        # Add the question text
-        pdf.set_font("Arial", size=12)
-        question_text = f"Question {i+1}: Fill in the missing entries for the expression: {question[1]}"
-        pdf.multi_cell(0, 10, txt=question_text, align='L')
-
-        # Save the current Y position to place the image
-        y_position = pdf.get_y()
-
-        # Add the options for the missing entries
-        options_text = "Options:\n"
-        for j, option in enumerate(options_list[i]):
-            options_text += f"{j+1}: {' '.join(map(str, option))}\n"
-        pdf.multi_cell(0, 10, txt=options_text, align='L')
-
-        # Add the image corresponding to this question
-        with open(answers[i], 'rb') as svg_file:
-            svg_content = svg_file.read()
-            png_data = convert_svg_to_png(svg_content)
-            # Save the PNG temporarily
-            png_temp_path = f'tmp_image_{i+1}.png'
-            with open(png_temp_path, 'wb') as f:
-                f.write(png_data.read())
+    def add_question_page(start_index):
+        pdf.add_page()
+        
+        # Add title and total time only on the first page
+        if start_index == 0:
+            pdf.set_font("Arial", 'B', 16)
+            pdf.cell(0, 10, txt="Self-Assessment Test", ln=True, align='C')
             
-            img_width = pdf.w / 3  # Adjust width to fit one-third of page width
-            img_height = img_width * 0.75  # Maintain aspect ratio
+            total_time = len(questions)  # Assuming 1 minute per question
+            pdf.set_font("Arial", size=12)
+            pdf.cell(0, 10, txt=f"Total Time: {total_time} minutes", ln=True, align='C')
+            
+            pdf.ln(10)  # Add a line break
 
-            # Calculate x position to place the image 4 cm (40 mm) to the right of the question text
-            x_position = 40  # 40 mm = 4 cm from the left margin
-            pdf.image(png_temp_path, x=x_position, y=y_position, w=img_width, h=img_height)
-            os.remove(png_temp_path)  # Delete the temporary PNG file
+        for i in range(start_index, min(start_index + 2, len(questions))):
+            # Add the question text
+            pdf.set_font("Arial", size=12)
+            question_text = f"Question {i+1}: Fill in the missing entries for the expression: {questions[i][1]}"
+            pdf.multi_cell(0, 10, txt=question_text, align='L')
 
-        pdf.ln(img_height + 20)  # Ensure space between questions and images
+            # Save the current Y position to place the image
+            y_position = pdf.get_y()
+
+            # Add the options for the missing entries
+            options_text = "Options:\n"
+            for j, option in enumerate(options_list[i]):
+                options_text += f"{j+1}: {' '.join(map(str, option))}\n"
+            pdf.multi_cell(0, 10, txt=options_text, align='L')
+
+            # Add the image corresponding to this question
+            with open(answers[i], 'rb') as svg_file:
+                svg_content = svg_file.read()
+                png_data = convert_svg_to_png(svg_content)
+                # Save the PNG temporarily
+                png_temp_path = f'tmp_image_{i+1}.png'
+                with open(png_temp_path, 'wb') as f:
+                    f.write(png_data.read())
+                
+                img_width = pdf.w / 3  # Adjust width to fit one-third of page width
+                img_height = img_width * 0.75 * 1.50 # Increase height by 25%
+
+
+                # Calculate x position to place the image 4 cm (40 mm) to the right of the question text
+                x_position = 50  # 40 mm = 4 cm from the left margin
+                pdf.image(png_temp_path, x=x_position, y=y_position, w=img_width, h=img_height)
+                os.remove(png_temp_path)  # Delete the temporary PNG file
+
+            pdf.ln(img_height + 2)  # Ensure space between questions and images
+        
+        # Add a line break before the next set of questions
+        pdf.ln(3)
+
+    num_questions = len(questions)
+    for start_index in range(0, num_questions, 2):
+        add_question_page(start_index)
 
     # Add a separate page for answers
     pdf.add_page()
