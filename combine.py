@@ -36,9 +36,10 @@ def create_and_save_diagram(expression, file_path):
         print(f"Error creating diagram for expression '{expression}': {e}")
 
 def convert_svg_to_png(svg_path):
-    """Convert SVG file to PNG format."""
+    """Convert SVG file to PNG format with increased resolution."""
     png_path = svg_path.replace('.svg', '.png')
-    cairosvg.svg2png(url=svg_path, write_to=png_path)
+    # Increase scale to improve quality
+    cairosvg.svg2png(url=svg_path, write_to=png_path, scale=2.0)  # Scale factor increased to 2.0
     return png_path
 
 def generate_simple_gate_operation_question():
