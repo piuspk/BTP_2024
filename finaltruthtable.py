@@ -29,8 +29,9 @@ def generate_random_expression(variables, existing_expressions):
         expression = f'({expression}) {op} ({expr})'
     
     # Ensure unique expression
-    while expression in existing_expressions:
-        expression = generate_random_expression(variables, existing_expressions)
+    if expression in existing_expressions:
+        existing_expressions.add(expression)  # Add the current expression to avoid infinite loop
+        return generate_random_expression(variables, existing_expressions)
     
     existing_expressions.add(expression)
     return expression
@@ -207,25 +208,18 @@ def main():
         valid_expr = generate_random_expression(variables, existing_expressions)
         truth_table = generate_truth_table(valid_expr, num_vars)
         
-        # Save the invalid truth table image
-        svg_path = os.path.join(image_directory, f'invalid_truth_table_{len(correct_answers) + 1}.svg')
-        generate_truth_table_image(truth_table, svg_path, num_vars)
-        answers.append(svg_path)
-        
-        # The expression does not match the truth table
-        correct_answers.append(False)
-        questions.append(expr)
+        if not does_truth_table_match_expression(expr, truth_table):
+            # Save the truth table image
+            svg_path = os.path.join(image_directory, f'truth_table_{len(correct_answers) + 1}.svg')
+            generate_truth_table_image(truth_table, svg_path, num_vars)
+            answers.append(svg_path)
+            
+            # The expression does not match the truth table
+            correct_answers.append(False)
+            questions.append(expr)
 
-    # Randomize questions
-    combined = list(zip(questions, answers, correct_answers))
-    random.shuffle(combined)
-    questions, answers, correct_answers = zip(*combined)
-
-    # Ask if the user wants to generate a PDF
-    create_pdf = input("Do you want to create a PDF with the questions and answers? (yes/no): ").strip().lower()
-    if create_pdf == 'yes':
-        generate_pdf(questions, answers, correct_answers)
+    # Generate the PDF with the questions and answers
+    generate_pdf(questions, answers, correct_answers)
 
 if __name__ == "__main__":
     main()
-    
