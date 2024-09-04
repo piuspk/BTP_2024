@@ -38,6 +38,32 @@ def evaluate_expression(expr, *values):
         expr = expr.replace(variables[i], str(value))
     return eval(expr.replace('and', ' and ').replace('or', ' or ').replace('not', ' not '))
 
+# Function to generate similar but incorrect expressions
+def generate_similar_but_incorrect_expression(correct_expr, variables, used_expressions):
+    operators = ['and', 'or']
+    max_attempts = 10  # Maximum number of attempts to generate a distinct incorrect expression
+    
+    for _ in range(max_attempts):
+        split_expr = correct_expr.split()
+
+        if random.choice([True, False]) and any(part in variables for part in split_expr):
+            # Negate a random variable
+            index_to_negate = random.choice([i for i, part in enumerate(split_expr) if part in variables])
+            split_expr[index_to_negate] = f'not ({split_expr[index_to_negate]})' if 'not' not in split_expr[index_to_negate] else split_expr[index_to_negate].replace('not ', '')
+        elif any(part in operators for part in split_expr):
+            # Change an operator
+            index_to_change = random.choice([i for i, part in enumerate(split_expr) if part in operators])
+            split_expr[index_to_change] = random.choice(operators)
+
+        new_expr = " ".join(split_expr)
+        
+        if new_expr != correct_expr and new_expr not in used_expressions:
+            used_expressions.add(new_expr)
+            return new_expr
+
+    # If all attempts fail, return a simple negation
+    return f'not ({correct_expr})' if 'not' not in correct_expr else correct_expr.replace('not ', '')
+
 # Function to generate the truth table
 def generate_truth_table_image(expr, save_path, num_vars):
     headers = [chr(65 + i) for i in range(num_vars)]  # Generate headers A, B, C, etc.
@@ -164,7 +190,8 @@ def main():
         correct_answers.append(expr)
 
         # Generate options including the correct one
-        options = [generate_random_expression(['A', 'B', 'C']) for _ in range(3)]
+        used_expressions = {expr}
+        options = [generate_similar_but_incorrect_expression(expr, variables, used_expressions) for _ in range(3)]
         options.append(expr)
         random.shuffle(options)
         original_options.append(options)  # Store the options for later use
